@@ -1,0 +1,7 @@
+#reactions for Knallgas detonation example 2 * H2 + O2 = 2 * H20
+
+@var: T = Tgas
+
+@format:idx,R,R,R,P,P,Tmin,rate
+
+1,H2,H2,O2,H2O,H2O,>20.0,1000000

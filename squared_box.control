@@ -1,0 +1,20 @@
+\begin{CONTROL_INPUT}
+
+   \begin{RUN_PARAMETERS}
+      mesh file name   = Rectangular_Box.mesh
+      plot file name   = Rectangular_Box.tec
+      stats file name  = None
+      mesh file format = ISM-v2
+      polynomial order = 1
+      plot file format = skeleton
+   \end{RUN_PARAMETERS}
+
+   \begin{BACKGROUND_GRID}
+       x0 = [0.0, 0.0, 0.0]
+       dx = [0.04, 0.04, 0.0]
+       N  = [150,150,0]
+   \end{BACKGROUND_GRID}
+
+\end{CONTROL_INPUT}
+
+\end{FILE}
