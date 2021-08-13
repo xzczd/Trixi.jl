@@ -61,6 +61,7 @@ include("amr.jl")
 include("stepsize.jl")
 include("glm_speed.jl")
 include("lbm_collision.jl")
+include("krome_chemistry.jl")
 
 
 # The `TrivialCallback` purposely does nothing: It allows to quickly disable specific callbacks

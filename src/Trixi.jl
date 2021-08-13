@@ -40,6 +40,7 @@ using Octavian: matmul!
 using Polyester: @batch # You know, the cheapest threads you can find...
 using OffsetArrays: OffsetArray, OffsetVector
 using P4est
+using KROME
 using RecipesBase
 using Requires
 using SparseArrays: sparse, droptol!, rowvals, nzrange, AbstractSparseMatrix
@@ -109,6 +110,7 @@ include("visualization/visualization.jl")
 export AcousticPerturbationEquations2D,
        CompressibleEulerEquations1D, CompressibleEulerEquations2D, CompressibleEulerEquations3D,
        CompressibleEulerMulticomponentEquations1D, CompressibleEulerMulticomponentEquations2D,
+       CompressibleEulerMultichemistryEquations1D, CompressibleEulerMultichemistryEquations2D,
        IdealGlmMhdEquations1D, IdealGlmMhdEquations2D, IdealGlmMhdEquations3D,
        IdealGlmMhdMulticomponentEquations1D, IdealGlmMhdMulticomponentEquations2D,
        HyperbolicDiffusionEquations1D, HyperbolicDiffusionEquations2D, HyperbolicDiffusionEquations3D,
@@ -151,6 +153,8 @@ export initial_condition_convergence_test, source_terms_convergence_test
 export initial_condition_harmonic_nonperiodic, source_terms_harmonic
 export initial_condition_poisson_periodic, source_terms_poisson_periodic
 export initial_condition_poisson_nonperiodic, source_terms_poisson_nonperiodic, boundary_condition_poisson_nonperiodic
+export initial_condition_knallgas_detonation, boundary_condition_knallgas_detonation, chemistry_knallgas_detonation,
+       initial_condition_knallgas_5_detonation, boundary_condition_knallgas_5_detonation, chemistry_knallgas_5_detonation,
 export initial_condition_briowu_shock_tube, initial_condition_torrilhon_shock_tube, initial_condition_ryujones_shock_tube,
        initial_condition_shu_osher_shock_tube, initial_condition_shu_osher_shock_tube_flipped
 export initial_condition_sedov_self_gravity, boundary_condition_sedov_self_gravity
@@ -187,7 +191,7 @@ export SemidiscretizationEulerGravity, ParametersEulerGravity,
 export SummaryCallback, SteadyStateCallback, AnalysisCallback, AliveCallback,
        SaveRestartCallback, SaveSolutionCallback, TimeSeriesCallback, VisualizationCallback,
        AMRCallback, StepsizeCallback,
-       GlmSpeedCallback, LBMCollisionCallback,
+       GlmSpeedCallback, LBMCollisionCallback, KROMEChemistryCallback,
        TrivialCallback
 
 export load_mesh, load_time
