@@ -147,14 +147,15 @@ export boundary_condition_periodic,
        boundary_condition_wall,
        boundary_condition_zero,
        BoundaryConditionWall,
-       boundary_state_slip_wall
+       boundary_state_slip_wall,
+       boundary_condition_slip_wall
 
 export initial_condition_convergence_test, source_terms_convergence_test
 export initial_condition_harmonic_nonperiodic, source_terms_harmonic
 export initial_condition_poisson_periodic, source_terms_poisson_periodic
 export initial_condition_poisson_nonperiodic, source_terms_poisson_nonperiodic, boundary_condition_poisson_nonperiodic
 export initial_condition_knallgas_detonation, boundary_condition_knallgas_detonation, chemistry_knallgas_detonation,
-       initial_condition_knallgas_5_detonation, boundary_condition_knallgas_5_detonation, chemistry_knallgas_5_detonation,
+       initial_condition_knallgas_5_detonation, boundary_condition_knallgas_5_detonation, chemistry_knallgas_5_detonation
 export initial_condition_briowu_shock_tube, initial_condition_torrilhon_shock_tube, initial_condition_ryujones_shock_tube,
        initial_condition_shu_osher_shock_tube, initial_condition_shu_osher_shock_tube_flipped
 export initial_condition_sedov_self_gravity, boundary_condition_sedov_self_gravity

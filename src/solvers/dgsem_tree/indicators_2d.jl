@@ -121,7 +121,7 @@ function (indicator_hg::IndicatorHennemannGassner)(u::AbstractArray{<:Any,4},
     end
   end
 
-  return alpha
+  return alpha #.= 1.0
 end
 
 

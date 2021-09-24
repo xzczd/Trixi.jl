@@ -12,17 +12,17 @@ equations = CompressibleEulerMultichemistryEquations2D(gammas             = (1.4
 
 initial_condition = initial_condition_knallgas_detonation
 
-boundary_conditions = boundary_condition_knallgas_detonation
+#boundary_conditions = boundary_condition_knallgas_detonation
 
-#boundary_condition = BoundaryConditionDirichlet(initial_condition)
-#boundary_conditions = (x_neg=boundary_condition,
-#                       x_pos=boundary_condition,
-#                       y_neg=boundary_condition,
-#                       y_pos=boundary_condition)
+boundary_condition = BoundaryConditionDirichlet(initial_condition)
+boundary_conditions = (x_neg=boundary_condition,
+                       x_pos=boundary_condition,
+                       y_neg=boundary_condition_slip_wall,
+                       y_pos=boundary_condition_slip_wall)
 
 chemistry_term = chemistry_knallgas_detonation
 
-surface_flux = flux_hllc
+surface_flux = flux_lax_friedrichs
 volume_flux  = flux_central
 basis = LobattoLegendreBasis(3)
 indicator_sc = IndicatorHennemannGassner(equations, basis,
@@ -41,8 +41,8 @@ coordinates_max = ( 6.0, 6.0)   # eigentlich (6, 2)
 #mesh = StructuredMesh((100, 100), coordinates_min, coordinates_max, periodicity=false)
 
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level=8,
-                n_cells_max=100_000,
+                initial_refinement_level=7,
+                n_cells_max=10_000_000,
                 periodicity=false)
 
 
@@ -59,14 +59,14 @@ ode = semidiscretize(semi, tspan)
 
 summary_callback = SummaryCallback()
 
-analysis_interval = 1000
+analysis_interval = 100
 
 analysis_callback = AnalysisCallback(semi, interval=analysis_interval)
 
 alive_callback = AliveCallback(analysis_interval=analysis_interval)
 
 save_solution = SaveSolutionCallback(interval=10000,
-                                     save_initial_solution=true,
+                                     save_initial_solution=false,
                                      save_final_solution=true,
                                      solution_variables=cons2prim)
 

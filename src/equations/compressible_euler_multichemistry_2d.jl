@@ -238,33 +238,111 @@
   end
   
   
-  """
-      boundary_state_slip_wall(u_internal, normal_direction::AbstractVector,
-                               equations::CompressibleEulerEquations2D)
-  Determine the external solution value for a slip wall condition. Sets the normal
-  velocity of the the exterior fictitious element to the negative of the internal value.
-  !!! warning "Experimental code"
-      This wall function can change any time.
-  """
-  @inline function boundary_state_slip_wall(u_internal, normal_direction::AbstractVector,
-                                            equations::CompressibleEulerMultichemistryEquations2D)
+  #"""
+  #    boundary_state_slip_wall(u_internal, normal_direction::AbstractVector,
+  #                             equations::CompressibleEulerEquations2D)
+  #Determine the external solution value for a slip wall condition. Sets the normal
+  #velocity of the the exterior fictitious element to the negative of the internal value.
+  #!!! warning "Experimental code"
+  #    This wall function can change any time.
+  #"""
+  #@inline function boundary_state_slip_wall(u_internal, normal_direction::AbstractVector,
+  #                                          equations::CompressibleEulerMultichemistryEquations2D)
+  #
+  #  # normalize the outward pointing direction
+  #  normal = normal_direction / norm(normal_direction)
+  #
+  #  # compute the normal and tangential components of the velocity
+  #  u_normal  = normal[1] * u_internal[1] + normal[2] * u_internal[2]
+  #  u_tangent = (u_internal[1] - u_normal * normal[1], u_internal[2] - u_normal * normal[2])
+  #
+  #  u_other = SVector{3, real(equations)}(u_tangent[1] - u_normal * normal[1],
+  #                                        u_tangent[2] - u_normal * normal[2],
+  #                                        u_internal[3]) 
+  #
+  #  u_rho = SVector{ncomponents(equations), real(equations)}(u_internal[i+3] for i in eachcomponent(equations))
+  #
+  #  return vcat(u_other, u_rho)
+  #end
+
+
+  #@inline function boundary_state_slip_wall(u_internal, orientation, normal_direction, x, t, surface_flux_function,
+  #                                          equations::CompressibleEulerMultichemistryEquations2D)
+  #
+  #  if orientation == 1
+  #    normal_direction = SVector(1, 0)
+  #  else 
+  #    normal_direction = SVector(0, 1)
+  #  end
+  #
+  #  # normalize the outward pointing direction
+  #  normal = normal_direction / norm(normal_direction)
+  #
+  #  # compute the normal and tangential components of the velocity
+  #  u_normal  = normal[1] * u_internal[1] + normal[2] * u_internal[2]
+  #  u_tangent = (u_internal[1] - u_normal * normal[1], u_internal[2] - u_normal * normal[2])
+  #
+  #  u_other = SVector{3, real(equations)}(u_tangent[1] - u_normal * normal[1],
+  #                                        u_tangent[2] - u_normal * normal[2],
+  #                                        u_internal[3]) 
+  #
+  #  u_rho = SVector{ncomponents(equations), real(equations)}(u_internal[i+3] for i in eachcomponent(equations))
+  #
+  #  return vcat(u_other, u_rho)
+  #end
+
+
+  function boundary_condition_slip_wall(u_inner, orientation, normal_direction, x, t,
+                                        surface_flux_function, equations::CompressibleEulerMultichemistryEquations2D)
+
+    if orientation == 1
+      normal_direction = SVector(1, 0)
+    else 
+      normal_direction = SVector(0, 1)
+    end
+
+    norm_ = norm(normal_direction)
+    # Normalize the vector without using `normalize` since we need to multiply by the `norm_` later
+    normal = normal_direction / norm_
+
+    # rotate the internal solution state
+    u_local = rotate_to_x(u_inner, normal, equations)
+
+    # compute the primitive variables
+    prim_local = cons2prim(u_local, equations)
+
+    v_normal  = prim_local[1]
+    v_tangent = prim_local[2]
+    p_local   = prim_local[3]
+    rho_local = sum(prim_local[4:end])
+
+    gamma = totalgamma(u_inner, equations)
+
+    # Get the solution of the pressure Riemann problem
+    # See Section 6.3.3 of
+    # Eleuterio F. Toro (2009)
+    # Riemann Solvers and Numerical Methods for Fluid Dynamics: A Pratical Introduction
+    # [DOI: 10.1007/b79761](https://doi.org/10.1007/b79761)
+    if v_normal <= 0.0
+      sound_speed = sqrt(gamma * p_local / rho_local) # local sound speed
+      p_star = p_local * (1.0 + 0.5 * (gamma - 1) * v_normal / sound_speed)^(2.0 * gamma * (1 / (gamma - 1.0)))
+    else # v_normal > 0.0
+      A = 2.0 / ((gamma + 1) * rho_local)
+      B = p_local * (gamma - 1) / (gamma + 1)
+      p_star = p_local + 0.5 * v_normal / A * (v_normal + sqrt(v_normal^2 + 4.0 * A * (p_local + B)))
+    end
+
+    # For the slip wall we directly set the flux as the normal velocity is zero
+
+    u_other = SVector{3, real(equations)}(p_star * normal[1] * norm_,
+                                          p_star * normal[2] * norm_,
+                                          zero(eltype(u_inner))) 
   
-    # normalize the outward pointing direction
-    normal = normal_direction / norm(normal_direction)
-  
-    # compute the normal and tangential components of the velocity
-    u_normal  = normal[1] * u_internal[1] + normal[2] * u_internal[2]
-    u_tangent = (u_internal[1] - u_normal * normal[1], u_internal[2] - u_normal * normal[2])
-  
-    u_other = SVector{3, real(equations)}(u_tangent[1] - u_normal * normal[1],
-                                          u_tangent[2] - u_normal * normal[2],
-                                          u_internal[3]) 
-  
-    u_rho = SVector{ncomponents(equations), real(equations)}(u_internal[i+3] for i in eachcomponent(equations))
-  
+    u_rho = SVector{ncomponents(equations), real(equations)}(zero(eltype(u_inner)) for i in eachcomponent(equations))
+
     return vcat(u_other, u_rho)
   end
-  
+
   
   @inline function chemistry_knallgas_detonation(u, dt, equations::CompressibleEulerMultichemistryEquations2D)
     # Same settings as in `initial_condition`
@@ -296,7 +374,7 @@
     p     = (gamma - 1) * (rho_e - 0.5 * rho * (v1^2 + v2^2) - p_chem)      
   
     Tgas  = fill(10.0 * (p/rho))
-  
+
     dt = fill(dt) # time-step
     krome(x, Tgas, dt)
   
@@ -844,12 +922,23 @@
   """
   @inline function flux_chandrashekar(u_ll, u_rr, orientation::Integer, equations::CompressibleEulerMultichemistryEquations2D)
     # Unpack left and right state
-    @unpack gammas, gas_constants, cv = equations
+    @unpack gammas, gas_constants, cv, heat_of_formations = equations
     rho_v1_ll, rho_v2_ll, rho_e_ll = u_ll
     rho_v1_rr, rho_v2_rr, rho_e_rr = u_rr
-    rhok_mean   = SVector{ncomponents(equations), real(equations)}(ln_mean(u_ll[i+3], u_rr[i+3]) for i in eachcomponent(equations))
+    
+    # for Chemistry
+    rhok_mean_help = zeros(ncomponents(equations))
+    for i in eachcomponent(equations)
+      if u_ll[i+3] <= 0.0 || u_rr[i+3] <= 0.0
+        rhok_mean_help[i] = 0.0
+      else
+        rhok_mean_help[i] = ln_mean(u_ll[i+3], u_rr[i+3])
+      end
+    end
+    #rhok_mean   = SVector{ncomponents(equations), real(equations)}(ln_mean(u_ll[i+3], u_rr[i+3]) for i in eachcomponent(equations))
+    rhok_mean   = SVector{ncomponents(equations), real(equations)}(rhok_mean_help[i] for i in eachcomponent(equations))
     rhok_avg    = SVector{ncomponents(equations), real(equations)}(0.5 * (u_ll[i+3] + u_rr[i+3]) for i in eachcomponent(equations))
-  
+
     # Iterating over all partial densities
     rho_ll      = density(u_ll, equations)
     rho_rr      = density(u_rr, equations)
@@ -874,9 +963,20 @@
       help1_ll  += u_ll[i+3] * cv[i]
       help1_rr  += u_rr[i+3] * cv[i]
     end
+
+    # Chemistry
+    p_chem_ll = zero(rho_ll)
+    for i in eachcomponent(equations)                             
+      p_chem_ll += heat_of_formations[i] * u_ll[i+3]                      
+    end
   
-    T_ll        = (rho_e_ll - 0.5 * rho_ll * (v1_ll^2 + v2_ll^2)) / help1_ll
-    T_rr        = (rho_e_rr - 0.5 * rho_rr * (v1_rr^2 + v2_rr^2)) / help1_rr
+    p_chem_rr = zero(rho_rr)
+    for i in eachcomponent(equations)                             
+      p_chem_rr += heat_of_formations[i] * u_rr[i+3]                      
+    end
+  
+    T_ll        = (rho_e_ll - 0.5 * rho_ll * (v1_ll^2 + v2_ll^2) - p_chem_ll) / help1_ll
+    T_rr        = (rho_e_rr - 0.5 * rho_rr * (v1_rr^2 + v2_rr^2) - p_chem_rr) / help1_rr
     T           = 0.5 * (1.0/T_ll + 1.0/T_rr)
     T_log       = ln_mean(1.0/T_ll, 1.0/T_rr)
   
@@ -907,7 +1007,103 @@
     return vcat(f_other, f_rho)
   end
   
+
+    """
+      flux_ranocha(u_ll, u_rr, orientation_or_normal_direction,
+                  equations::CompressibleEulerMulticomponentEquations2D)
+  Adaption of the entropy conserving and kinetic energy preserving two-point flux by
+  - Hendrik Ranocha (2018)
+    Generalised Summation-by-Parts Operators and Entropy Stability of Numerical Methods
+    for Hyperbolic Balance Laws
+    [PhD thesis, TU Braunschweig](https://cuvillier.de/en/shop/publications/7743)
+  See also
+  - Hendrik Ranocha (2020)
+    Entropy Conserving and Kinetic Energy Preserving Numerical Methods for
+    the Euler Equations Using Summation-by-Parts Operators
+    [Proceedings of ICOSAHOM 2018](https://doi.org/10.1007/978-3-030-39647-3_42)
+  """
+  @inline function flux_ranocha(u_ll, u_rr, orientation::Integer, equations::CompressibleEulerMultichemistryEquations2D)
+    # Unpack left and right state
+    @unpack gammas, gas_constants, cv, heat_of_formations = equations
+    rho_v1_ll, rho_v2_ll, rho_e_ll = u_ll
+    rho_v1_rr, rho_v2_rr, rho_e_rr = u_rr
+    rhok_mean   = SVector{ncomponents(equations), real(equations)}(ln_mean(u_ll[i+3], u_rr[i+3]) for i in eachcomponent(equations))
+    rhok_avg    = SVector{ncomponents(equations), real(equations)}(0.5 * (u_ll[i+3] + u_rr[i+3]) for i in eachcomponent(equations))
+
+    # Iterating over all partial densities
+    rho_ll      = density(u_ll, equations)
+    rho_rr      = density(u_rr, equations)
+
+    # Calculating gamma
+    gamma               = totalgamma(0.5*(u_ll+u_rr), equations)
+    inv_gamma_minus_one = 1/(gamma-1) 
+
+    # Chemistry
+    p_chem_ll = zero(rho_ll)
+    for i in eachcomponent(equations)                             
+      p_chem_ll += heat_of_formations[i] * u_ll[i+3]                      
+    end
   
+    p_chem_rr = zero(rho_rr)
+    for i in eachcomponent(equations)                             
+      p_chem_rr += heat_of_formations[i] * u_rr[i+3]                      
+    end
+
+    # extract velocities
+    v1_ll               = rho_v1_ll / rho_ll
+    v1_rr               = rho_v1_rr / rho_rr
+    v1_avg              = 0.5 * (v1_ll + v1_rr)
+    v2_ll               = rho_v2_ll / rho_ll 
+    v2_rr               = rho_v2_rr / rho_rr
+    v2_avg              = 0.5 * (v2_ll + v2_rr)
+    velocity_square_avg = 0.5 * (v1_ll * v1_rr + v2_ll * v2_rr)
+
+    # helpful variables
+    help1_ll  = zero(v1_ll)
+    help1_rr  = zero(v1_rr)
+    enth_ll   = zero(v1_ll)
+    enth_rr   = zero(v1_rr)
+    for i in eachcomponent(equations)
+      enth_ll   += u_ll[i+3] * gas_constants[i]
+      enth_rr   += u_rr[i+3] * gas_constants[i]
+      help1_ll  += u_ll[i+3] * cv[i]
+      help1_rr  += u_rr[i+3] * cv[i]
+    end
+
+    # temperature and pressure
+    T_ll            = (rho_e_ll - 0.5 * rho_ll * (v1_ll^2 + v2_ll^2) - p_chem_ll) / help1_ll
+    T_rr            = (rho_e_rr - 0.5 * rho_rr * (v1_rr^2 + v2_rr^2) - p_chem_rr) / help1_rr
+    p_ll            = T_ll * enth_ll 
+    p_rr            = T_rr * enth_rr
+    p_avg           = 0.5 * (p_ll + p_rr)
+    inv_rho_p_mean  = p_ll * p_rr * inv_ln_mean(rho_ll * p_rr, rho_rr * p_ll)
+
+    f_rho_sum = zero(T_rr)
+    if orientation == 1
+      f_rho = SVector{ncomponents(equations), real(equations)}(rhok_mean[i]*v1_avg for i in eachcomponent(equations))
+      for i in eachcomponent(equations)
+        f_rho_sum += f_rho[i]
+      end
+      f1 = f_rho_sum * v1_avg + p_avg
+      f2 = f_rho_sum * v2_avg
+      f3 = f_rho_sum * (velocity_square_avg + inv_rho_p_mean * inv_gamma_minus_one) + 0.5 * (p_ll*v1_rr + p_rr*v1_ll)
+    else
+      f_rho = SVector{ncomponents(equations), real(equations)}(rhok_mean[i]*v2_avg for i in eachcomponent(equations))
+      for i in eachcomponent(equations)
+        f_rho_sum += f_rho[i]
+      end
+      f1 = f_rho_sum * v1_avg
+      f2 = f_rho_sum * v2_avg + p_avg
+      f3 = f_rho_sum * (velocity_square_avg + inv_rho_p_mean * inv_gamma_minus_one) + 0.5 * (p_ll*v2_rr + p_rr*v2_ll)
+    end
+
+    # momentum and energy flux
+    f_other  = SVector{3, real(equations)}(f1, f2, f3)
+
+    return vcat(f_other, f_rho)
+  end
+
+
   function flux_hllc(u_ll, u_rr, orientation::Integer, equations::CompressibleEulerMultichemistryEquations2D)
     # Calculate primitive variables and speed of sound
     @unpack heat_of_formations = equations
@@ -1052,15 +1248,6 @@
   
     p_ll     = (gamma_ll - 1.0) * (rho_e_ll - 0.5 * rho_ll * (v_mag_ll^2) - p_chem_ll)     
   
-    if p_ll < 0.0
-      println("p_ll: ",p_ll)
-      println("p_chem_ll: ",p_chem_ll)
-      println("heat: ",heat_of_formations)
-    end 
-    if rho_ll < 0.0 
-      println("rho_ll: ",rho_ll)
-    end
-  
     #p_ll = (gamma_ll - 1) * (rho_e_ll - 1/2 * rho_ll * v_mag_ll^2)
     c_ll = sqrt(gamma_ll * p_ll / rho_ll)
   
@@ -1075,12 +1262,7 @@
   
     p_rr     = (gamma_rr - 1.0) * (rho_e_rr - 0.5 * rho_rr * (v_mag_rr^2) - p_chem_rr)   
     #p_rr = (gamma_rr - 1) * (rho_e_rr - 1/2 * rho_rr * v_mag_rr^2)
-    if p_rr < 0.0
-      println("p_rr: ",p_rr)
-    end 
-    if rho_rr < 0.0 
-      println("rho_rr: ",rho_rr)
-    end
+
     c_rr = sqrt(gamma_rr * p_rr / rho_rr)
   
     λ_max = max(v_mag_ll, v_mag_rr) + max(c_ll, c_rr)
@@ -1115,6 +1297,57 @@
     return (abs(v1) + c, abs(v2) + c, )
   end
   
+
+  # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
+  # has been normalized prior to this rotation of the state vector
+  @inline function rotate_to_x(u, normal_vector, equations::CompressibleEulerMultichemistryEquations2D)
+    # cos and sin of the angle between the x-axis and the normalized normal_vector are
+    # the normalized vector's x and y coordinates respectively (see unit circle).
+    c = normal_vector[1]
+    s = normal_vector[2]
+
+    # Apply the 2D rotation matrix with normal and tangent directions of the form
+    # [ 1    0    0   0;
+    #   0   n_1  n_2  0;
+    #   0   t_1  t_2  0;
+    #   0    0    0   1 ]
+    # where t_1 = -n_2 and t_2 = n_1
+
+    u_other = SVector(c * u[1] + s * u[2],
+                      -s * u[1] + c * u[2],
+                      u[3])
+
+    u_rho = SVector{ncomponents(equations), real(equations)}(u[3+i] for i in eachcomponent(equations))
+
+    return vcat(u_other, u_rho)
+  end
+
+
+  # Called inside `FluxRotated` in `numerical_fluxes.jl` so the direction
+  # has been normalized prior to this back-rotation of the state vector
+  @inline function rotate_from_x(u, normal_vector, equations::CompressibleEulerMultichemistryEquations2D)
+    # cos and sin of the angle between the x-axis and the normalized normal_vector are
+    # the normalized vector's x and y coordinates respectively (see unit circle).
+    c = normal_vector[1]
+    s = normal_vector[2]
+
+    # Apply the 2D back-rotation matrix with normal and tangent directions of the form
+    # [ 1    0    0   0;
+    #   0   n_1  t_1  0;
+    #   0   n_2  t_2  0;
+    #   0    0    0   1 ]
+    # where t_1 = -n_2 and t_2 = n_1
+
+    u_other = SVector(c * u[1] - s * u[2],
+                      s * u[1] + c * u[2],
+                      u[3])
+
+    u_rho = SVector{ncomponents(equations), real(equations)}(u[3+i] for i in eachcomponent(equations))
+
+
+    return vcat(u_other, u_rho)
+  end
+
   
   # Convert conservative variables to primitive
   @inline function cons2prim(u, equations::CompressibleEulerMultichemistryEquations2D)
@@ -1170,10 +1403,12 @@
       help1 += u[i+3] * cv[i]
     end
   
-    T         = (rho_e - 0.5 * rho * v_square) / (help1)
+    T         = (rho_e - 0.5 * rho * v_square - p_chem) / (help1)
   
+    #entrop_rho  = SVector{ncomponents(equations), real(equations)}(1.0 * (cv[i] * log(T) - gas_constants[i] * log(u[i+3])) + gas_constants[i] + cv[i] - (v_square / (2*T)) for i in eachcomponent(equations))
     entrop_rho  = SVector{ncomponents(equations), real(equations)}(i for i in eachcomponent(equations)) #-1.0 * (cv[i] * log(T) - gas_constants[i] * log(u[i+3])) + gas_constants[i] + cv[i] - (v_square / (2*T)) for i in eachcomponent(equations))
-  
+
+
     w1        = v1/T
     w2        = v2/T
     w3        = -1.0/T

@@ -17,7 +17,7 @@ boundary_condition = boundary_condition_knallgas_detonation
 #boundary_conditions = BoundaryConditionDirichlet(initial_condition_knallgas_detonation)
 
 boundary_condition_dirichlet = BoundaryConditionDirichlet(initial_condition)
-boundary_condition_slip_wall = BoundaryConditionWall(boundary_state_slip_wall)
+boundary_condition_slip_wall = BoundaryConditionWall(boundary_condition_slip_wall)
 
 boundary_conditions = Dict( :all => boundary_condition_dirichlet)
                             #:Top    => boundary_condition_slip_wall,
